@@ -1,5 +1,5 @@
 # 🧮 Golang SrvPlex
-> Created for the Leishmaniapp Cloud project
+> Created for the LeishmaniappCloudServicesV2 project
 
 Server multiplexer with gRPC support used to allow multiple servers to run and stop concurrently in the same Go program
 
