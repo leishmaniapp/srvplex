@@ -16,22 +16,22 @@ type GrpcSrvCfg struct {
 	Port     uint16
 }
 
-// [SrvHndlr] for gRPC services
-type GrpcHandler struct {
+// GrpcHndlr is a [SrvHndlr] for gRPC services
+type GrpcHndlr struct {
 	Srv *grpc.Server
 	Cfg GrpcSrvCfg
 }
 
-// Create a new [GrpcHndlr]
-func NewGrpcHandler(cfg GrpcSrvCfg) *GrpcHandler {
-	return &GrpcHandler{
+// NewGrpcHandler Create a new [GrpcHndlr]
+func NewGrpcHandler(cfg GrpcSrvCfg) *GrpcHndlr {
+	return &GrpcHndlr{
 		Srv: grpc.NewServer(),
 		Cfg: cfg,
 	}
 }
 
-// Implementation for the [SrvHdlr] interface
-func (s *GrpcHandler) Serve(wg *sync.WaitGroup, stopch <-chan struct{}, errch chan<- error) {
+// Serve defines the implementation for the [SrvHdlr] interface
+func (s *GrpcHndlr) Serve(wg *sync.WaitGroup, stopch <-chan struct{}, errch chan<- error) {
 
 	// Indicate that the work is done
 	defer wg.Done()
@@ -50,8 +50,8 @@ func (s *GrpcHandler) Serve(wg *sync.WaitGroup, stopch <-chan struct{}, errch ch
 	grpc_reflection.Register(s.Srv)
 
 	// Create the health server
-	health_server := grpc_health_server.NewServer()
-	grpc_health_service.RegisterHealthServer(s.Srv, health_server)
+	healthServer := grpc_health_server.NewServer()
+	grpc_health_service.RegisterHealthServer(s.Srv, healthServer)
 
 	go func() {
 		// Listen for the signal
@@ -68,7 +68,8 @@ func (s *GrpcHandler) Serve(wg *sync.WaitGroup, stopch <-chan struct{}, errch ch
 	}
 }
 
-func (s *GrpcHandler) ForceKill() {
+// ForceKill stop the server now
+func (s *GrpcHndlr) ForceKill() {
 	// Force stop the server
 	s.Srv.Stop()
 }

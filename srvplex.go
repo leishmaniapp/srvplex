@@ -7,19 +7,19 @@ import (
 	"github.com/leishmaniapp/srvplex/internal/tools"
 )
 
-// Defines the interface for compatible server handlers
+// SrvHdlr Defines the interface for compatible server handlers
 type SrvHdlr interface {
-	// Start the server execution
+	// Serve Start the server execution
 	// wg: Once the server stops, the wg must be marked as done
 	// stopch: Once the server is intenteded to stop a message will be recieved
 	// errorch: Async error communication to the multiplexer
 	Serve(wg *sync.WaitGroup, stopch <-chan struct{}, errch chan<- error)
 
-	// Stop the server immediately
+	// ForceKill stops the server immediately
 	ForceKill()
 }
 
-// Run multiple [SrvHdlr] at the same time
+// Multiplexer runs multiple [SrvHdlr] at the same time
 type Multiplexer struct {
 	// Store the server alongside the stop channel
 	servers []tools.Tuple[SrvHdlr, chan struct{}]
@@ -31,18 +31,20 @@ type Multiplexer struct {
 	errhdlr func(error)
 }
 
-// Create a server multiplexer
+// NewServerMultiplex creates a server multiplexer
 func NewServerMultiplex(errhdlr func(error)) *Multiplexer {
 	return &Multiplexer{
 		wg:      new(sync.WaitGroup),
 		errhdlr: errhdlr,
+		// Create the error channel for broadcasting errors
+		errorch: make(chan error, 1),
 	}
 }
 
-// Add a [SrvHdlr] to the multiplexer
+// AddServer add a [SrvHdlr] to the multiplexer
 func (m *Multiplexer) AddServer(s SrvHdlr) {
-	// Create the stop channel
-	stopchan := make(chan struct{})
+	// Create the stop channel (make it buffered for non-blocking operation)
+	stopchan := make(chan struct{}, 1)
 	// Append the server with its channel
 	m.servers = append(m.servers, tools.Tuple[SrvHdlr, chan struct{}]{
 		First: s, Second: stopchan,
@@ -70,11 +72,22 @@ func (m *Multiplexer) Run() {
 	}
 }
 
+// Stop running all services
 func (m *Multiplexer) Stop(ctx context.Context) error {
 	// Send the stop signal to every server
 	for _, v := range m.servers {
+		select {
 		// Send the stop signal
-		v.Second <- struct{}{}
+		case v.Second <- struct{}{}:
+		// Context timeout, force quit
+		case <-ctx.Done():
+			// Force quit all the servers
+			for _, v := range m.servers {
+				v.First.ForceKill()
+			}
+			// Return the error
+			return ctx.Err()
+		}
 	}
 
 	// Stop the server with the context
